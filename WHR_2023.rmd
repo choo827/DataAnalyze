@@ -1,0 +1,316 @@
+---
+title: "세계 행복 보고서 2023 분석"
+output: html_document
+---
+학과: 통계학과
+
+
+학번: 202104241
+
+
+이름: 추승원
+
+* * *
+### 목차
+0. 데이터 준비하기
+1. 2023 보고서 변경점
+2. 세계에서 가장 행복한 10개국
+3. 세계에서 가장 슬픈 10개국
+4. 세계 지역별 행복지수
+5. 상관관계 분석
+6. 주요 요인
+
+* * *
+
+## 0. 데이터 준비하기
+* 2021 보고서와 2023 보고서 국가 비교
+* 결측치 확인
+* 2023 보고서에 Regional indicator 열 추가
+```{r}
+library(tidyverse)
+library(ggchicklet)
+library(cowplot)
+library(waffle)
+library(hrbrthemes)
+library(ggalt)
+library(GGally)
+library(rwa)
+```
+
+```{r}
+# 2021 보고서와 2023 보고서 불러오기
+df_2021 <- read.csv("/Users/choo827/DataspellProjects/Test/world-happiness-report-2021.csv")
+df_2023 <- read.csv("/Users/choo827/DataspellProjects/Test/WHR2023.csv")
+
+# 2021 보고서에 있는 국가가 2023 보고서 안에 있으면 Yes를 반환, 없으면 ❌를 반환
+ifelse(df_2021$Country.name %in% df_2023$Country.name, "Yes", "❌")
+
+# 2023 보고서에 있는 국가가 2021 보고서 안에 있으면 Yes를 반환, 없으면 ❌를 반환
+ifelse(df_2023$Country.name %in% df_2021$Country.name, "Yes", "❌")
+
+```
+```{r}
+# 결측치 확인
+sum(is.na(df_2021))
+sum(is.na(df_2023))
+```
+> State of Palestine의 데이터 3개가 NA인 것을 확인. 2021 보고서 데이터 값으로 입력
+```{r}
+# Regional indicator 열을 추가한 2023 보고서 불러오기
+df_new2023 <- read.csv("/Users/choo827/DataspellProjects/Test/new_WHR2023.csv")
+
+# 결측치 확인
+sum(is.na(df_new2023))
+```
+## 1. 2023 보고서 변경점
+#### 이름이 변경된 국가
+1. 🇨🇿Czech Republic ➡️ Czechia
+2. 🇵🇸Palestinian Territories ➡️ State of Palestine
+3. 🇹🇷Turkey ➡️ Turkiye
+
+#### 기록이 추가된 국가
+1. 🇨🇩Congo (Kinshasa)
+
+#### 기록이 삭제된 국가
+1. 🇦🇿Azerbaijan
+2. 🇧🇾Belarus
+3. Burundi
+4. 🇭🇹Haiti
+5. 🇰🇼Kuwait
+6. 🇱🇸Lesotho
+7. 🇱🇾Libya
+8. 🇲🇻Maldives
+9. 🇨🇾North Cyprus
+10. 🇷🇼Rwanda
+11. 🇸🇿Swaziland
+12. 🇹🇲Turkmenistan
+13. 🇾🇪Yemen
+
+* * *
+
+## 2. 세계에서 가장 행복한 10개국
+```{r}
+dimensions <- c('Ladder.score', 'Logged.GDP.per.capita', 'Social.support', 'Healthy.life.expectancy', 'Freedom.to.make.life.choices', 'Generosity', 'Perceptions.of.corruption')
+
+# map country to regions
+country_region_dict <- df_new2023 %>%
+  select(country = Country.name, region = Regional.indicator) %>%
+  unique()
+
+df_new2023_long <- df_new2023 %>%
+  select(country = Country.name, all_of(dimensions)) %>%
+  mutate(absence_of_corruption = 1 - Perceptions.of.corruption) %>%
+  pivot_longer(cols = c(all_of(dimensions), 'absence_of_corruption'), names_to = 'dimension', values_to = 'score') %>%
+  filter(dimension != "Perceptions.of.corruption")
+
+df_new2023_tranformed <- df_new2023_long %>%
+  group_by(dimension) %>%
+  mutate(min_value = min(score),
+         max_value = max(score)) %>%
+  mutate(score_pct = (score - min_value) / (max_value - min_value)) %>%
+  ungroup()
+
+# get top 10
+df_new2023_top10 <- df_new2023_tranformed %>%
+  filter(dimension == "Ladder.score") %>%
+  slice_max(score, n = 10) %>%
+  mutate(cat = 'top_10',
+         country_rank = rank(-score),
+         country_label = paste0(country, ' (', country_rank, ')'))
+
+ggplot(df_new2023_top10, aes(x = reorder(country_label, score))) +
+  geom_chicklet(aes(y = 10, fill = 4.9), width = 0.75, radius = grid::unit(2, "pt")) +
+  geom_chicklet(aes(y = score, fill = score), width = 0.75, radius = grid::unit(2, "pt")) +
+  geom_text(aes(y = score), label = round(df_new2023_top10$score, 2), nudge_y = 0.4, size = 4) +
+  scale_y_continuous(expand = c(0, 0.1), position = "right", limits = c(0, 10)) +
+  scale_fill_gradient2(low = 'black', high = '#4dbb5f', mid = 'white', midpoint = 5) +
+  coord_flip() +
+  labs(y = "Best possible life = 10", x = '',
+       title = "10 Happiest Countries in the World",
+       caption = "Source: The World Happiness Report 2023") +
+  theme_ipsum(grid = '') +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14),
+        plot.caption = element_text(size = 10),
+        axis.title.x = element_text(size = 10, color = '#aaaaaa'),
+        axis.text.y = element_text(size = 12, color = 'black'),
+        axis.text.x = element_blank(),
+        legend.position = 'None')
+
+```
+
+상위 10개 국가 중 9개 국가가 유럽에 속해 있음을 볼 수 있습니다.
+
+
+* * *
+## 3. 세계에서 가장 슬픈 10개국
+
+```{r}
+# get bottom 10
+df_new2023_bottom10 <- df_new2023_tranformed %>%
+  filter(dimension == "Ladder.score") %>%
+  mutate(country_rank = rank(score),
+         country_label = paste0(country, ' (', country_rank, ')')) %>%
+  slice_min(score, n = 10) %>%
+  mutate(cat = 'bottom_10')
+
+ggplot(df_new2023_bottom10, aes(x = reorder(country_label, score))) +
+  geom_chicklet(aes(y = 10, fill = 4.9), width = 0.75, radius = grid::unit(2, "pt")) +
+  geom_chicklet(aes(y = score, fill = score), width = 0.75, radius = grid::unit(2, "pt")) +
+  geom_text(aes(y = score), label = round(df_new2023_bottom10$score, 2), nudge_y = 0.4, size = 4) +
+  scale_y_continuous(expand = c(0, 0.1), position = "right", limits = c(0, 10)) +
+  scale_fill_gradient2(low = 'black', high = '#7FB185', mid = 'white', midpoint = 5) +
+  coord_flip() +
+  labs(y = "Best possible life = 10", x = '',
+       title = "10 Saddest Countries in the World",
+       caption = "Source: The World Happiness Report 2023") +
+  theme_ipsum(grid = '') +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14),
+        plot.caption = element_text(size = 10),
+        axis.title.x = element_text(size = 10, color = '#aaaaaa'),
+        axis.text.y = element_text(size = 12, color = 'black'),
+        axis.text.x = element_blank(),
+        legend.position = 'None')
+```
+
+하위 10개 국가 중 7개 국가가 아프리카에 속해 있습니다. 더 자세히 알아보기 위해 지역별 행복지수를 알아보겠습니다.
+
+* * *
+
+## 4. 세계 지역별 행복지수
+```{r}
+
+df_waffle <- df_new2023_tranformed %>%
+  filter(dimension == 'Ladder.score') %>%
+  left_join(country_region_dict, by = 'country') %>%
+  mutate(score_bin = cut(score, seq(2, 8, 1), right = FALSE)) %>%
+  group_by(region) %>%
+  mutate(region_avg = mean(score)) %>%
+  ungroup() %>%
+  mutate(region = reorder(region, region_avg)) %>%
+  count(region, score_bin) %>%
+  arrange(score_bin, n)
+
+score_levels <- levels(df_waffle$score_bin)
+
+pal <- colorRampPalette(c("black", "white", "#7FB185"))
+
+ggplot(df_waffle, aes(fill = score_bin, values = n)) +
+  geom_waffle(color = "white", size = 0.33, n_rows = 6, flip = TRUE, na.rm = FALSE, radius = unit(2, "pt")) +
+  facet_wrap(~region, nrow = 2, strip.position = "bottom", labeller = label_wrap_gen()) +
+  scale_x_discrete() +
+  scale_y_continuous(labels = function(x) x * 6, # make this multiplyer the same as n_rows
+                     expand = c(0, 0),
+                     limits = c(0, 7)) +
+  scale_fill_manual(
+    name = "Green indicates more happiness",
+    values = pal(6),
+    labels = c('', '', '', '', '', '')
+  ) +
+  coord_equal() +
+  labs(
+    title = "Happiness by World Region",
+    caption = "1 square = a country\nSource: The World Happiness Report 2023",
+    y = "Country Count"
+  ) +
+  theme_ipsum(grid = '') +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14),
+        plot.caption = element_text(size = 10),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.position = "top",
+        legend.box = 'vertical',
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 8)) +
+  guides(fill = guide_legend(reverse = FALSE, nrow = 1, byrow = TRUE))
+```
+
+가장 행복한 지역은 북미와 서유럽임을 볼 수 있습니다.
+
+* * *
+
+## 5. 상관관계 분석
+```{r}
+df_cor <- df_new2023 %>%
+  select(corruption = Perceptions.of.corruption,
+         generosity = Generosity,
+         freedom = Freedom.to.make.life.choices,
+         life_expectancy = Healthy.life.expectancy,
+         social_support = Social.support,
+         GDP_per_capita = Logged.GDP.per.capita,
+         happiness = Ladder.score
+  )
+
+ggcorr(df_cor,
+       method = c("everything", "pearson"),
+       size = 4, hjust = 0.77,
+       low = '#ff0000', mid = 'white', high = "#2e8b57",
+       label = TRUE, label_size = 4,
+       layout.exp = 1) +
+  labs(title = 'Correlation Matrix',) +
+  theme_ipsum()
+```
+
+행복은 1. 부(GDP), 2. 건강, 3. 사회적 지원, 4. 자유와 가장 밀접한 상관관계가 있음을 볼 수 있습니다.
+
+* * *
+
+## 6. 주요 요인 분석
+
+```{r}
+predictors <- colnames(df_cor)[1:6]
+outcome <- 'happiness'
+rwa <- rwa(df_cor,
+           outcome = outcome,
+           predictors = predictors,
+           applysigns = FALSE)
+
+rsquare <- rwa$rsquare
+(relative_weight <- rwa$result)
+n <- rwa$n
+
+ggplot(relative_weight, aes(x = reorder(Variables, Rescaled.RelWeight), y = Rescaled.RelWeight, fill = Rescaled.RelWeight)) +
+  geom_chicklet(width = 0.75, radius = grid::unit(2, "pt")) +
+  geom_text(label = paste0(round(relative_weight$Rescaled.RelWeight, 0), "%"), nudge_y = 0.4, size = 4) +
+  scale_y_continuous(expand = c(0, 0.2), limits = c(0, 40)) +
+  scale_fill_gradient(low = 'white', high = '#7FB185') +
+  coord_flip() +
+  labs(y = "Rescaled Relative Weights", x = '',
+       title = "Variable importance estimates",
+       caption = paste0("Note: Recaled Relative Weights sum to 100%. n = ", n, '. R-squared:', round(rsquare, 2))) +
+  theme_ipsum(grid = '') +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14),
+        plot.caption = element_text(size = 10),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 12, color = 'black'),
+        axis.text.x = element_blank(),
+        legend.position = 'None')
+```
+
+행복에 중요한 3가지 요인:
+
+1. 사회적 지원
+2. GDP
+3. 자유, 기대수명
+임을 볼 수 있습니다.
+
+* * *
+
+### 2023 세계 행복 보고서로 알게된 점
+세계에서 가장 행복한 지역은 북미와 서유럽입니다.
+
+
+행복에 중요한 3가지 주요 요인:
+
+1. 사회적 지원
+2. GDP
+3. 자유, 기대수명
+
+
+
