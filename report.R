@@ -2,8 +2,24 @@ df <- read.csv("/Users/choo827/DataspellProjects/DataAnalyze/new_WHR2023.csv")
 glimpse(dataset)
 head(dataset)
 
-# 선형회귀
+# 패키지 설치
+library(corrplot)
+library(ggplot2)
 
+df_order <- df[order(df$Ladder.score),]
+ggplot(data = df_order, aes(x = reorder(Country.name, Ladder.score), y = Ladder.score)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab('Country') +
+  ylab('Score')
+
+# boxplot
+ggplot(data = df_order, aes(x = reorder(Regional.indicator, Ladder.score), y = Ladder.score)) +
+  geom_boxplot(aes(fill = Regional.indicator)) +
+  theme_bw() +
+  theme(axis.title = element_text(family = "Helvetica", size = (8)), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# 선형회귀
 # 그래프 분할
 par(mfrow = c(3, 2))
 
@@ -37,7 +53,7 @@ lm_fit6 <- lm(df$Ladder.score ~ df$Perceptions.of.corruption)
 plot(df$Perceptions.of.corruption, df$Ladder.score)
 abline(lm_fit6)
 
-
+# 중회귀 분석
 lm_fit7 <- lm(df$Ladder.score ~ df$Logged.GDP.per.capita +
   df$Social.support +
   df$Healthy.life.expectancy +
@@ -45,23 +61,21 @@ lm_fit7 <- lm(df$Ladder.score ~ df$Logged.GDP.per.capita +
   df$Generosity +
   df$Perceptions.of.corruption)
 summary(lm_fit7)
+
+par(mfrow = c(2, 2))
 plot(lm_fit7)
 
-cor(df$Logged.GDP.per.capita, df$Ladder.score)
-cor(df$Social.support, df$Ladder.score)
-cor(df$Healthy.life.expectancy, df$Ladder.score)
-cor(df$Freedom.to.make.life.choices, df$Ladder.score)
-cor(df$Generosity, df$Ladder.score)
-cor(df$Perceptions.of.corruption, df$Ladder.score)
+# 상관계수
+# cor(df$Logged.GDP.per.capita, df$Ladder.score)
+# cor(df$Social.support, df$Ladder.score)
+# cor(df$Healthy.life.expectancy, df$Ladder.score)
+# cor(df$Freedom.to.make.life.choices, df$Ladder.score)
+# cor(df$Generosity, df$Ladder.score)
+# cor(df$Perceptions.of.corruption, df$Ladder.score)
 
-
-data <- df[c(3, 7:11)]
-cor(data)
-
-install.packages('corrplot')
-library(corrplot)
-
+# 상관계수 분석
+data <- df[c(3, 7:12)]
 col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
-corrplot(cor(data), method = 'color',
+corrplot(cor(data, method = "pearson"), method = 'color',
          tl.srt = 45, type = "lower",
          col = col(200), addCoef.col = "black", diag = FALSE)
